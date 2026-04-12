@@ -80,6 +80,24 @@ KonvergoWindow
         )
     }
 
+    function injectSessionCache()
+    {
+        var js = loadTextResource("qrc:/compat/win81-cache.js")
+        if (js.length === 0)
+            return
+
+        var jsPayload = jsStringEscape(js)
+        web.runJavaScript(
+            "(function(){" +
+            "var old=document.getElementById('jmp-session-cache');"+
+            "if(old && old.parentNode) old.parentNode.removeChild(old);" +
+            "var s=document.createElement('script');s.id='jmp-session-cache';" +
+            "s.text='" + jsPayload + "';" +
+            "(document.head||document.documentElement).appendChild(s);" +
+            "})();"
+        )
+    }
+
     function runWebAction(action)
     {
         if (mainWindow.webDesktopMode)
@@ -252,6 +270,7 @@ KonvergoWindow
             {
                 console.log("WebEngineLoadRequest success: " + loadRequest.url);
 
+                injectSessionCache()   // implements cache, runs for all Windows versions
                 if (shouldApplyWin81IconCompat())
                     injectWin81IconCompat()
             }

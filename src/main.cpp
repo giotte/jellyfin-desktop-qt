@@ -107,6 +107,9 @@ void ShowLicenseInfo()
 QStringList g_qtFlags = {
   "--disable-web-security",
   "--enable-gpu-rasterization",
+  "--enable-zero-copy",
+  "--num-raster-threads=4",
+  "--enable-native-gpu-memory-buffers",
 #ifdef Q_OS_LINUX
   "--disable-gpu"
 #endif
