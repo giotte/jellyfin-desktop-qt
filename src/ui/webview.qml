@@ -15,25 +15,14 @@ KonvergoWindow
 
     function loadTextResource(url)
     {
-        try
-        {
+        try {
             var xhr = new XMLHttpRequest()
             xhr.open("GET", url, false)
             xhr.send()
-
             if (xhr.status === 200 || xhr.status === 0)
-            {
-                var text = xhr.responseText || ""
-                console.log("[win81-icons] Loaded text resource: " + url + " bytes=" + text.length)
-                return text
-            }
-
-            console.log("[win81-icons] Failed loading text resource: " + url + " status=" + xhr.status)
+                return xhr.responseText || ""
             return ""
-        }
-        catch (e)
-        {
-            console.log("[win81-icons] Exception loading text resource: " + url + " error=" + e)
+        } catch (e) {
             return ""
         }
     }
@@ -54,97 +43,41 @@ KonvergoWindow
 
     function shouldApplyWin81IconCompat()
     {
-        try
-        {
+        try {
             return components.system.isWindows && components.system.win81IconCompatEnabled
-        }
-        catch (e)
-        {
-            console.log("[win81-icons] Exception checking compat flag: " + e)
+        } catch (e) {
             return false
         }
     }
 
     function injectWin81IconCompat()
     {
-        try
-        {
-            console.log("[win81-icons] inject start")
+        var css = loadTextResource("qrc:/compat/win81-icons.css")
+        var js = loadTextResource("qrc:/compat/win81-icons.js")
+        if (css.length === 0 || js.length === 0)
+            return
 
-            var css = loadTextResource("qrc:/compat/win81-icons.css")
-            var js = loadTextResource("qrc:/compat/win81-icons.js")
+        var cssPayload = jsStringEscape(css)
+        var jsPayload = jsStringEscape(js)
 
-            if (css.length === 0 || js.length === 0)
-            {
-                console.log("[win81-icons] missing compat resources css=" + css.length + " js=" + js.length)
-                return
-            }
+        web.runJavaScript(
+            "(function(){" +
+            "var s=document.getElementById('jmp-win81-icon-compat');" +
+            "if(!s){s=document.createElement('style');s.id='jmp-win81-icon-compat';" +
+            "(document.head||document.documentElement).appendChild(s);}" +
+            "s.textContent='" + cssPayload + "';" +
+            "})();"
+        )
 
-            var materialFamily = "Material Icons"
-            try
-            {
-                materialFamily = components.system.materialIconsFontFamily
-                if (!materialFamily || materialFamily.length === 0)
-                    materialFamily = "Material Icons"
-            }
-            catch (e2)
-            {
-                console.log("[win81-icons] failed reading materialIconsFontFamily: " + e2)
-                materialFamily = "Material Icons"
-            }
-
-            console.log("[win81-icons] material family: " + materialFamily)
-
-            if (materialFamily !== "Material Icons")
-            {
-                css = ":root { --jmp-material-icons-family: '" + materialFamily + "', 'JMPCompatMaterialIcons', 'Material Icons'; }\n" + css
-            }
-
-            var cssPayload = jsStringEscape(css)
-            var jsPayload = jsStringEscape(js)
-
-            web.runJavaScript(
-                "(function(){"
-              + "try{"
-              + "var s=document.getElementById('jmp-win81-icon-compat');"
-              + "if(!s){"
-              + "s=document.createElement('style');"
-              + "s.id='jmp-win81-icon-compat';"
-              + "(document.head||document.documentElement).appendChild(s);"
-              + "}"
-              + "s.textContent='" + cssPayload + "';"
-              + "console.log('[win81-icons] css injected bytes=' + s.textContent.length);"
-              + "}catch(e){console.log('[win81-icons] css injection exception: ' + e);}"
-              + "})();"
-            )
-
-            web.runJavaScript(
-                "(function(){"
-              + "try{"
-              + "var old=document.getElementById('jmp-win81-icon-script');"
-              + "if(old && old.parentNode) old.parentNode.removeChild(old);"
-              + "var s=document.createElement('script');"
-              + "s.id='jmp-win81-icon-script';"
-              + "s.text='" + jsPayload + "';"
-              + "(document.head||document.documentElement).appendChild(s);"
-              + "console.log('[win81-icons] js injected bytes=' + s.text.length);"
-              + "}catch(e){console.log('[win81-icons] js injection exception: ' + e);}"
-              + "})();"
-            )
-
-            web.runJavaScript(
-                "(function(){"
-              + "try{"
-              + "var n=document.querySelectorAll('.material-icons, i.material-icons, [class*=\"material-icons\"], .md-icon, .paper-icon-button-light i, .headerButton i, .playstatebutton i').length;"
-              + "console.log('[win81-icons] immediate icon node count=' + n);"
-              + "}catch(e){console.log('[win81-icons] icon count exception: ' + e);}"
-              + "})();"
-            )
-        }
-        catch (e)
-        {
-            console.log("[win81-icons] inject exception: " + e)
-        }
+        web.runJavaScript(
+            "(function(){" +
+            "var old=document.getElementById('jmp-win81-icon-script');" +
+            "if(old && old.parentNode) old.parentNode.removeChild(old);" +
+            "var s=document.createElement('script');s.id='jmp-win81-icon-script';" +
+            "s.text='" + jsPayload + "';" +
+            "(document.head||document.documentElement).appendChild(s);" +
+            "})();"
+        )
     }
 
     function runWebAction(action)
@@ -319,17 +252,6 @@ KonvergoWindow
             {
                 console.log("WebEngineLoadRequest success: " + loadRequest.url);
 
-                try
-                {
-                    console.log("[win81-icons] load succeeded; compatEnabled="
-                                + shouldApplyWin81IconCompat()
-                                + " family=" + components.system.materialIconsFontFamily);
-                }
-                catch (e)
-                {
-                    console.log("[win81-icons] load success logging exception: " + e);
-                }
-
                 if (shouldApplyWin81IconCompat())
                     injectWin81IconCompat()
             }
@@ -337,9 +259,10 @@ KonvergoWindow
             {
                 console.log("WebEngineLoadRequest failure: " + loadRequest.url + " error code: " + loadRequest.errorCode);
                 errorLabel.visible = true
-                errorLabel.text = "Error loading client, this is bad and should not happen\n"
-                                + "You can try to reload or head to our support page\nActual Error:\n\n> "
-                                + loadRequest.errorString + " [" + loadRequest.errorCode + "]"
+                errorLabel.text = "Error loading client, this is bad and should not happen<br>" +
+                                  "You can try to <a href='reload'>reload</a> or head to our <a href='http://jellyfin.org'>support page</a><br><br>Actual Error: <pre>" +
+                                  loadRequest.errorString + " [" + loadRequest.errorCode + "]</pre><br><br>" +
+                                  "Provide the <a target='_blank' href='file://"+ components.system.logFilePath + "'>logfile</a> as well."
             }
         }
 
@@ -347,16 +270,16 @@ KonvergoWindow
         {
             if (request.userInitiated)
             {
-                console.log("Opening external URL: " + web.currentHoveredUrl);
-                components.system.openExternalUrl(web.currentHoveredUrl);
+                console.log("Opening external URL: " + web.currentHoveredUrl)
+                components.system.openExternalUrl(web.currentHoveredUrl)
             }
         }
 
         onFullScreenRequested:
         {
-            console.log("Request fullscreen: " + request.toggleOn);
-            mainWindow.setFullScreen(request.toggleOn);
-            request.accept();
+            console.log("Request fullscreen: " + request.toggleOn)
+            mainWindow.setFullScreen(request.toggleOn)
+            request.accept()
         }
 
         onJavaScriptConsoleMessage:
@@ -366,9 +289,10 @@ KonvergoWindow
 
         onCertificateError:
         {
-            console.log(error.url + " " + error.description + " " + error.error);
-            if (components.settings.ignoreSSLErrors)
-                error.ignoreCertificateError();
+            console.log(error.url + " :" + error.description + error.error)
+            if (components.settings.ignoreSSLErrors()) {
+                error.ignoreCertificateError()
+            }
         }
     }
 
@@ -383,10 +307,8 @@ KonvergoWindow
         font.pixelSize: 32
         font.bold: true
         visible: false
-        horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         textFormat: Text.StyledText
-
         onLinkActivated:
         {
             if (link == "reload")
@@ -400,6 +322,7 @@ KonvergoWindow
             }
         }
     }
+
 
     Rectangle
     {
@@ -428,11 +351,11 @@ KonvergoWindow
 
             function windowDebug()
             {
-                var dbg = mainWindow.debugInfo
-                dbg += "Window and web\n"
-                dbg += " Window size: " + parent.width + " x " + parent.height + " - " + web.width + " x " + web.height + "\n"
-                dbg += " DevicePixel ratio: " + Screen.devicePixelRatio + "\n"
-                return dbg
+                var dbg = mainWindow.debugInfo + "Window and web\n";
+                dbg += "  Window size: " + parent.width + "x" + parent.height + " - " + web.width + "x" + web.height + "\n";
+                dbg += "  DevicePixel ratio: " + Screen.devicePixelRatio + "\n";
+
+                return dbg;
             }
 
             text: windowDebug()
@@ -452,6 +375,7 @@ KonvergoWindow
             color: "white"
             font.pixelSize: Math.round(height / 65)
             wrapMode: Text.WrapAnywhere
+
             text: mainWindow.videoInfo
         }
     }

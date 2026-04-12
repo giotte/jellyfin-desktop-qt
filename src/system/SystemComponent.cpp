@@ -338,7 +338,6 @@ QString SystemComponent::getNativeShellScript()
     QFile pf{path + name + ".js"};
     if (pf.open(QIODevice::ReadOnly)) {
       inlinePlugins.insert(name, QJsonValue(QTextStream(&pf).readAll()));
-      qDebug() << "Loaded inline plugin:" << name;
     } else {
       qWarning() << "Could not load inline plugin:" << path + name + ".js";
     }
