@@ -22,6 +22,9 @@ public:
   Q_PROPERTY(bool isLinux READ platformIsLinux CONSTANT)
   Q_PROPERTY(qreal scale MEMBER m_scale CONSTANT)
 
+  Q_PROPERTY(bool win81IconCompatEnabled READ win81IconCompatEnabled CONSTANT)
+  Q_PROPERTY(QString materialIconsFontFamily READ materialIconsFontFamily CONSTANT)  
+
   bool componentExport() override { return true; }
   const char* componentName() override { return "system"; }
   bool componentInitialize() override;
@@ -89,6 +92,12 @@ public:
   inline QString authenticationToken() { return m_authenticationToken; }
   inline bool cursorVisible() { return m_cursorVisible; }
 
+  inline bool win81IconCompatEnabled() const { return m_win81IconCompatEnabled; }
+  inline QString materialIconsFontFamily() const { return m_materialIconsFontFamily; }
+
+  void setWin81IconCompatEnabled(bool enabled) { m_win81IconCompatEnabled = enabled; }
+  void setMaterialIconsFontFamily(const QString& family) { m_materialIconsFontFamily = family; }
+  
   Q_INVOKABLE void crashApp();
 
   void updateScale(qreal scale);
@@ -117,6 +126,9 @@ private:
   QString m_webClientVersion;
   bool m_cursorVisible;
   qreal m_scale;
+
+  bool m_win81IconCompatEnabled;
+  QString m_materialIconsFontFamily;
 
 };
 

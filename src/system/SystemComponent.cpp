@@ -46,7 +46,7 @@ QMap<SystemComponent::PlatformArch, QString> g_platformArchNames = {
 
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-SystemComponent::SystemComponent(QObject* parent) : ComponentBase(parent), m_platformType(platformTypeUnknown), m_platformArch(platformArchUnknown), m_doLogMessages(false), m_cursorVisible(true), m_scale(1)
+SystemComponent::SystemComponent(QObject* parent) : ComponentBase(parent), m_platformType(platformTypeUnknown), m_platformArch(platformArchUnknown), m_doLogMessages(false), m_cursorVisible(true), m_win81IconCompatEnabled(false), m_materialIconsFontFamily(QStringLiteral("Material Icons")), m_scale(1)
 {
   m_mouseOutTimer = new QTimer(this);
   m_mouseOutTimer->setSingleShot(true);

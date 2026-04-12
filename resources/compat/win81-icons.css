@@ -1,0 +1,57 @@
+.jmp-icon-host,
+.jmp-icon-forced {
+  text-indent: 0 !important;
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+.jmp-icon-host::before,
+.jmp-icon-host::after,
+.jmp-icon-forced::before,
+.jmp-icon-forced::after {
+  content: none !important;
+  display: none !important;
+}
+
+.jmp-icon-host > *:not(.jmp-icon-text) {
+  display: none !important;
+}
+
+.jmp-icon-text {
+  display: inline-block !important;
+  font-family: "Segoe UI", Arial, sans-serif !important;
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: inherit !important;
+  vertical-align: middle !important;
+  white-space: nowrap !important;
+}
+
+.material-icons.jmp-icon-forced,
+i.material-icons.jmp-icon-forced,
+.cardImageIcon.jmp-icon-forced,
+.navMenuOptionIcon.jmp-icon-forced,
+.listItemIcon.jmp-icon-forced,
+.md-icon.jmp-icon-forced {
+  display: inline-block !important;
+  min-width: 1.8em !important;
+}
+
+.cardOverlayButtonIcon.jmp-icon-forced {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 2.2em !important;
+  min-height: 1.6em !important;
+}
+
+.cardOverlayButtonIcon.jmp-icon-forced .jmp-icon-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+}
