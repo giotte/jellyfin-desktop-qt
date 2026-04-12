@@ -1296,6 +1296,14 @@ void PlayerComponent::setVideoConfiguration()
   {
     hwdecMode = "auto-copy";
   }
+
+#ifdef Q_OS_WIN
+  // On Win 8.1, D3D11/DXVA hwdec interop fails under ANGLE and causes mpv's
+  // render thread to hang on a GPU fence. Force software decoding unconditionally.
+  if (QSysInfo::windowsVersion() <= QSysInfo::WV_WINDOWS8_1)
+    hwdecMode = QStringLiteral("no");
+#endif
+
   mpv::qt::set_property(m_mpv, "hwdec", hwdecMode);
   mpv::qt::set_property(m_mpv, "hwdec-image-format", hwdecVTFormat);
 

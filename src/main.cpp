@@ -206,17 +206,17 @@ int main(int argc, char *argv[])
         parser.addOption(devOption);
         parser.addOption(platformOption);
 
-#ifdef Q_OS_WIN
-        if (isWindows81OrOlder())
-        {
-            if (!g_qtFlags.contains("--disable-gpu"))
-                g_qtFlags << "--disable-gpu";
-            if (!g_qtFlags.contains("--disable-gpu-compositing"))
-                g_qtFlags << "--disable-gpu-compositing";
-            if (!g_qtFlags.contains("--disable-direct-composition"))
-                g_qtFlags << "--disable-direct-composition";
-        }
-#endif
+// #ifdef Q_OS_WIN
+//         if (isWindows81OrOlder())
+//         {
+//             if (!g_qtFlags.contains("--disable-gpu"))
+//                 g_qtFlags << "--disable-gpu";
+//             if (!g_qtFlags.contains("--disable-gpu-compositing"))
+//                 g_qtFlags << "--disable-gpu-compositing";
+//             if (!g_qtFlags.contains("--disable-direct-composition"))
+//                 g_qtFlags << "--disable-direct-composition";
+//         }
+// #endif
 
         qDebug() << "[win81-icons] final g_qtFlags=" << g_qtFlags.join(" ");
 
