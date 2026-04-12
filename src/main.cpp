@@ -117,17 +117,17 @@ int main(int argc, char *argv[])
 {
   try
   {
-#ifdef Q_OS_WIN
-    if (isWindows81OrOlder())
-    {
-      qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
-              "--disable-gpu --disable-gpu-compositing --disable-direct-composition");
-    }
-    else
-    {
-      qunsetenv("QTWEBENGINE_CHROMIUM_FLAGS");
-    }
-#endif
+// #ifdef Q_OS_WIN
+//     if (isWindows81OrOlder())
+//     {
+//       qputenv("QTWEBENGINE_CHROMIUM_FLAGS",
+//               "--disable-gpu --disable-gpu-compositing --disable-direct-composition");
+//     }
+//     else
+//     {
+//       qunsetenv("QTWEBENGINE_CHROMIUM_FLAGS");
+//     }
+// #endif
 
     QCommandLineParser parser;
     parser.setApplicationDescription("Jellyfin Media Player");
