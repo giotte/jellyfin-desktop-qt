@@ -98,6 +98,36 @@ KonvergoWindow
         )
     }
 
+    function injectWin81Refresh()
+    {
+        var css = loadTextResource("qrc:/compat/win81-refresh.css")
+        var js = loadTextResource("qrc:/compat/win81-refresh.js")
+        if (css.length === 0 || js.length === 0)
+            return
+
+        var cssPayload = jsStringEscape(css)
+        var jsPayload = jsStringEscape(js)
+
+        web.runJavaScript(
+            "(function(){" +
+            "var s=document.getElementById('jmp-refresh-style');" +
+            "if(!s){s=document.createElement('style');s.id='jmp-refresh-style';" +
+            "(document.head||document.documentElement).appendChild(s);}" +
+            "s.textContent='" + cssPayload + "';" +
+            "})();"
+        )
+
+        web.runJavaScript(
+            "(function(){" +
+            "var old=document.getElementById('jmp-refresh-script');" +
+            "if(old && old.parentNode) old.parentNode.removeChild(old);" +
+            "var s=document.createElement('script');s.id='jmp-refresh-script';" +
+            "s.text='" + jsPayload + "';" +
+            "(document.head||document.documentElement).appendChild(s);" +
+            "})();"
+        )
+    }
+
     function runWebAction(action)
     {
         if (mainWindow.webDesktopMode)
@@ -271,6 +301,7 @@ KonvergoWindow
                 console.log("WebEngineLoadRequest success: " + loadRequest.url);
 
                 injectSessionCache()   // implements cache, runs for all Windows versions
+                injectWin81Refresh()   // refresh button, runs for all Windows versions
                 if (shouldApplyWin81IconCompat())
                     injectWin81IconCompat()
             }
