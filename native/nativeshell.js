@@ -37,11 +37,22 @@ function loadScript(src) {
 }
 
 // Add plugin loaders
+// Use inline bodies when available (prevents file:// load from https:// origin)
 for (const plugin of plugins) {
-    window[plugin] = async () => {
-        await loadScript(`${jmpInfo.scriptPath}${plugin}.js`);
-        return window["_" + plugin];
-    };
+    if (jmpInfo.inlinePlugins && jmpInfo.inlinePlugins[plugin]) {
+        window[plugin] = async () => {
+            const s = document.createElement('script');
+            s.text = jmpInfo.inlinePlugins[plugin];
+            document.head.appendChild(s);
+            return window["_" + plugin];
+        };
+    } else {
+        // Fallback: original dynamic load (works on local-file builds)
+        window[plugin] = async () => {
+            await loadScript(`${jmpInfo.scriptPath}${plugin}.js`);
+            return window["_" + plugin];
+        };
+    }
 }
 
 window.NativeShell = {
