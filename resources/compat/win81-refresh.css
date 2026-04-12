@@ -1,0 +1,59 @@
+/* Win 8.1 Refresh Button */
+
+#jmp-refresh-btn {
+  /* ── Layout ── */
+  display:         inline-flex;
+  align-items:     center;
+  justify-content: center;
+
+  /* ── Size — matches Jellyfin header icon buttons ── */
+  width:  40px;
+  height: 40px;
+  padding: 0;
+
+  /* ── Colours — adapts to light/dark theme via CSS variables with fallbacks ── */
+  background: transparent;
+  color: var(--theme-text-color, #ffffff);
+  border: none;
+  border-radius: 50%;
+
+  /* ── Typography ── */
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+
+  /* ── Smooth transitions ── */
+  transition: background 0.15s ease, opacity 0.15s ease;
+
+  /* ── Positioning — sits in the flex row of header buttons ── */
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+#jmp-refresh-btn:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+#jmp-refresh-btn:active:not([disabled]) {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+#jmp-refresh-btn[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Spinning animation while refresh is in progress */
+@-webkit-keyframes jmp-spin {
+  from { -webkit-transform: rotate(0deg); }
+  to   { -webkit-transform: rotate(360deg); }
+}
+@keyframes jmp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+#jmp-refresh-btn.jmp-refresh-spinning {
+  -webkit-animation: jmp-spin 0.7s linear infinite;
+          animation: jmp-spin 0.7s linear infinite;
+}
