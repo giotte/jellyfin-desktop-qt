@@ -1,15 +1,15 @@
 // Win 8.1 Refresh Button
 // Injects a floating refresh button into the Jellyfin toolbar.
 // Clicking it:
-//   1. Temporarily enables cache-busting on ApiClient.getItems (one cycle)
-//   2. Clears the JMP session cache
-//   3. Reloads the active tab via selectedIndex round-trip
+//   1. Clears the JMP session cache
+//   2. Reloads the active tab via selectedIndex round-trip
 
 (function () {
   'use strict';
 
   var BTN_ID     = 'jmp-refresh-btn';
   var SPINNER_MS = 1200; // how long to show the spinning state
+  var RETRY_MS   = 100;  // how often to retry finding .headerRight
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -23,58 +23,12 @@
   }
 
   function getOtherIndex(current) {
-    // find a tab button whose data-index differs from current
     var buttons = document.querySelectorAll('.emby-tab-button');
     for (var i = 0; i < buttons.length; i++) {
       var idx = parseInt(buttons[i].getAttribute('data-index'), 10);
       if (!isNaN(idx) && idx !== current) return idx;
     }
     return -1;
-  }
-
-  // ── Cache-busting patch ──────────────────────────────────────────────────────
-  // Wraps _original (the real getItems before our session cache) so that
-  // for one refresh cycle every outgoing URL gets a unique ?_jmp= timestamp.
-  // This forces Chromium's in-memory HTTP cache to treat it as a new request.
-
-  function runWithHttpCacheBust(callback) {
-    if (typeof ApiClient === 'undefined' || !ApiClient.__jmpCacheInstalled) {
-      // cache script not ready — just run the callback as-is
-      callback();
-      return;
-    }
-
-    // Grab the reference to the real (unwrapped) getItems that win81-cache.js
-    // stored. We temporarily replace it with a busting version.
-    var savedOriginal = ApiClient.__jmpOriginal;
-    if (!savedOriginal) {
-      callback();
-      return;
-    }
-
-    var busting = true;
-
-    ApiClient.__jmpOriginal = function (userId, params) {
-      var bustParams = {};
-      var k;
-      for (k in params) {
-        if (Object.prototype.hasOwnProperty.call(params, k)) {
-          bustParams[k] = params[k];
-        }
-      }
-      bustParams._jmp = Date.now();
-      return savedOriginal.call(this, userId, bustParams);
-    };
-
-    callback();
-
-    // Restore after the tab switch has had time to fire its requests (~600 ms)
-    setTimeout(function () {
-      if (busting) {
-        ApiClient.__jmpOriginal = savedOriginal;
-        busting = false;
-      }
-    }, 600);
   }
 
   // ── Core refresh sequence ────────────────────────────────────────────────────
@@ -84,20 +38,16 @@
     var current = getActiveIndex();
     var other   = getOtherIndex(current);
 
-    // 1. Clear JS-level session cache
     if (typeof window.__jmpClearCache === 'function') {
       window.__jmpClearCache();
     }
 
     if (!tabsEl || current < 0 || other < 0) return;
 
-    // 2. Perform HTTP cache-bust + tab round-trip
-    runWithHttpCacheBust(function () {
-      tabsEl.selectedIndex(other);
-      setTimeout(function () {
-        tabsEl.selectedIndex(current);
-      }, 50);
-    });
+    tabsEl.selectedIndex(other);
+    setTimeout(function () {
+      tabsEl.selectedIndex(current);
+    }, 50);
   }
 
   // ── Button state helpers ─────────────────────────────────────────────────────
@@ -112,15 +62,13 @@
     }
   }
 
-  // ── Button injection ─────────────────────────────────────────────────────────
+  // ── Button creation ──────────────────────────────────────────────────────────
 
-  function injectButton() {
-    if (document.getElementById(BTN_ID)) return; // already present
-
+  function createButton() {
     var btn = document.createElement('button');
-    btn.id          = BTN_ID;
-    btn.title       = 'Refresh';
-    btn.innerHTML   = '&#x21BB;'; // ↻  U+21BB CLOCKWISE OPEN CIRCLE ARROW
+    btn.id        = BTN_ID;
+    btn.title     = 'Refresh';
+    btn.innerHTML = '&#x21BB;'; // ↻
 
     btn.addEventListener('click', function () {
       setSpinning(btn, true);
@@ -130,30 +78,50 @@
       }, SPINNER_MS);
     });
 
-    // Prefer the right-side header controls area; fall back to body
-    var target =
-      document.querySelector('.headerRight') ||
-      document.querySelector('.skinHeader') ||
-      document.querySelector('.headerButtons') ||
-      document.body;
-
-    target.appendChild(btn);
+    return btn;
   }
 
-  // ── Toolbar observer ─────────────────────────────────────────────────────────
-  // The Jellyfin SPA swaps header content on navigation.
-  // We watch for DOM changes so the button survives page transitions.
+  // ── Injection with retry ─────────────────────────────────────────────────────
+  // .headerRight is rendered by the Jellyfin SPA after the page JS runs,
+  // so we poll until it exists before inserting the button.
 
-  var _observer = null;
+  function injectButton() {
+    // If button already exists and is inside .headerRight, nothing to do
+    var existing = document.getElementById(BTN_ID);
+    var target   = document.querySelector('.headerRight');
+
+    if (existing && target && target.contains(existing)) return;
+
+    if (!target) {
+      // .headerRight not ready yet — retry
+      setTimeout(injectButton, RETRY_MS);
+      return;
+    }
+
+    // Remove stale button from wherever it ended up (e.g. body fallback)
+    if (existing && existing.parentNode) {
+      existing.parentNode.removeChild(existing);
+    }
+
+    target.appendChild(createButton());
+  }
+
+  // ── SPA navigation observer ──────────────────────────────────────────────────
+  // Jellyfin swaps header content on navigation, which removes our button.
+  // Watch for that and re-inject.
 
   function startObserver() {
-    if (_observer) return;
-    _observer = new MutationObserver(function () {
-      if (!document.getElementById(BTN_ID)) {
+    var observer = new MutationObserver(function () {
+      var btn    = document.getElementById(BTN_ID);
+      var target = document.querySelector('.headerRight');
+
+      // Re-inject if button is gone, or if it exists but not inside headerRight
+      if (!btn || (target && !target.contains(btn))) {
         injectButton();
       }
     });
-    _observer.observe(document.documentElement, { childList: true, subtree: true });
+
+    observer.observe(document.documentElement, { childList: true, subtree: true });
   }
 
   // ── Entry point ──────────────────────────────────────────────────────────────
