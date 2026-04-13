@@ -264,7 +264,8 @@ KonvergoWindow
         settings.allowRunningInsecureContent: true
         settings.playbackRequiresUserGesture: false
         profile.httpUserAgent: components.system.getUserAgent()
-        profile.httpCacheType: WebEngineProfile.MemoryHttpCache
+        //profile.httpCacheType: WebEngineProfile.MemoryHttpCache
+        profile.httpCacheType: WebEngineProfile.DiskHttpCache
         url: mainWindow.webUrl
         focus: true
         property string currentHoveredUrl: ""
