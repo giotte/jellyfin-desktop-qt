@@ -163,22 +163,22 @@
     return String(value).toLowerCase().split(',').indexOf(String(wanted).toLowerCase()) !== -1;
   }
 
-  function isMatchingTrackedRequest(evt, topParentId, includeItemType) {
+  function isMatchingTrackedRequest(evt, topParentId) {
     if (!evt || evt.kind !== 'getItems') return false;
 
     var p = evt.finalParams || {};
     var parentId = p.ParentId || p.parentId || '';
-    var includeTypes = p.IncludeItemTypes || p.includeItemTypes || '';
+    //var includeTypes = p.IncludeItemTypes || p.includeItemTypes || '';
     var hasJmp = p._jmp != null;
 
     if (String(parentId) !== String(topParentId)) return false;
-    if (!includesItemType(includeTypes, includeItemType)) return false;
+    //if (!includesItemType(includeTypes, includeItemType)) return false;
     if (!hasJmp) return false;
 
     return true;
   }
 
-  function waitForTrackedRequest(topParentId, includeItemType, trace) {
+  function waitForTrackedRequest(topParentId, trace) {
     return waitFor(function () {
       var tracker = window.__jmpReq;
       if (!tracker || !tracker.events || !tracker.events.length) return null;
@@ -186,15 +186,24 @@
       var events = tracker.events;
       var i;
       for (i = events.length - 1; i >= 0; i--) {
-        if (isMatchingTrackedRequest(events[i], topParentId, includeItemType)) {
+        //if (isMatchingTrackedRequest(events[i], topParentId, includeItemType)) {
+        if (isMatchingTrackedRequest(events[i], topParentId)) {
           return events[i];
         }
       }
       return null;
-    }, { name: 'waitForTrackedRequest(' + includeItemType + ')', interval: 25, timeout: 8000 }).then(function(evt) {
-      tlog(trace, 'tracked request seen for', includeItemType, evt);
+    //}, { name: 'waitForTrackedRequest(' + includeItemType + ')', interval: 25, timeout: 8000 }).then(function(evt) {
+    }, { name: 'waitForTrackedRequest', interval: 25, timeout: 8000 }).then(function(evt) {
+      //tlog(trace, 'tracked request seen for', includeItemType, evt);
+      tlog(trace, 'tracked request seen', evt);
       return evt;
     });
+  }
+
+  function delay(ms) {
+    return new Promise(function (resolve) {
+      setTimeout(resolve, ms);
+    })
   }
 
   function waitForTrackedRequestDone(reqId, trace) {
@@ -316,14 +325,17 @@
             return null;
           }
 
-          // Wait for the actual refreshed Movies (tab 0) request, not DOM children.
-          return waitForTrackedRequest(topParentId, 'Movie', trace)
+          // Wait for the actual refreshed tab-0 request for this section (any type).
+          return waitForTrackedRequest(topParentId, trace)
             .then(function(evt) {
               return waitForTrackedRequestDone(evt.id, trace);
             })
             .then(function(evt) {
-              tlog(trace, 'movies refresh request completed; restoring saved tab', savedTabIndex, evt);
+              tlog(trace, 'section refresh request completed; restoring saved tab', savedTabIndex, evt);
               logSnapshot(trace, 'before-restore-saved-tab');
+              return delay(100);
+            })
+            .then(function () {
               return restoreSavedTab(savedTabIndex, trace);
             });
         })

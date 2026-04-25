@@ -1,0 +1,28 @@
+IDI_ICON ICON jellyfin.ico
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     @VERSION_MAJOR@,@VERSION_MINOR@,@VERSION_NANO@,0
+PRODUCTVERSION  @VERSION_MAJOR@,@VERSION_MINOR@,@VERSION_NANO@,0
+FILEFLAGSMASK   0x3fL
+FILEFLAGS       0x0L
+FILEOS          0x40004L
+FILETYPE        0x1L
+FILESUBTYPE     0x0L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "FileDescription",  "Jellyfin Media Player, JWMod\0"
+      VALUE "FileVersion",      "@VERSION_STRING@\0"
+      VALUE "ProductName",      "Jellyfin Media Player\0"
+      VALUE "ProductVersion",   "@VERSION_STRING@\0"
+      VALUE "OriginalFilename", "JellyfinMediaPlayer.exe\0"
+      VALUE "LegalCopyright",   "GNU GPL v2\0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x0409, 0x04B0
+  END
+END
