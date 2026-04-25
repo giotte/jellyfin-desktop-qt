@@ -4,15 +4,19 @@
 //   1. Clears the JMP session cache for the current section
 //   2. Records the current section (topParentId) and active tab index
 //   3. Navigates to Home (away from the section)
-//   4. Navigates back to the original section, then restores the saved tab
+//   4. Navigates back to the original section
+//   5. Waits for the refreshed tab-0 Movies request to complete
+//   6. Restores the saved tab
+//
+// This version uses request-based synchronization rather than DOM child-count
+// heuristics so repeated refreshes are not fooled by stale DOM.
 
 (function () {
   'use strict';
 
   var BTN_ID   = 'jmp-refresh-btn';
-  var RETRY_MS = 100; // how often to retry finding .headerRight
+  var RETRY_MS = 100;
 
-  // Prevent double-load
   if (window.__jmpWin81RefreshLoaded) {
     return;
   }
@@ -23,6 +27,24 @@
   function log() {
     var args = Array.prototype.slice.call(arguments);
     args.unshift('[JMP refresh]');
+    console.log.apply(console, args);
+  }
+
+  function nowMs() {
+    return Date.now();
+  }
+
+  function makeRefreshTrace() {
+    return {
+      id: nowMs(),
+      t0: nowMs()
+    };
+  }
+
+  function tlog(trace) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var dt = nowMs() - trace.t0;
+    args.unshift('[JMP refresh #' + trace.id + ' +' + dt + 'ms]');
     console.log.apply(console, args);
   }
 
@@ -40,11 +62,45 @@
     if (activeBtn && activeBtn.getAttribute('data-index') != null) {
       return parseInt(activeBtn.getAttribute('data-index'), 10);
     }
+
     var activePage = document.querySelector('.pageTabContent.is-active');
     if (activePage && activePage.getAttribute('data-index') != null) {
       return parseInt(activePage.getAttribute('data-index'), 10);
     }
+
     return 0;
+  }
+
+  function getItemsContainer() {
+    return document.querySelector('[is="emby-itemscontainer"]');
+  }
+
+  function getDomSnapshot() {
+    var activeBtn = document.querySelector('.emby-tab-button-active');
+    var activeIdx = activeBtn ? activeBtn.getAttribute('data-index') : null;
+    var activeText = activeBtn ? normalizeText(activeBtn.textContent) : null;
+
+    var activePage = document.querySelector('.pageTabContent.is-active');
+    var activePageIdx = activePage ? activePage.getAttribute('data-index') : null;
+
+    var container = getItemsContainer();
+    var childCount = container && container.children ? container.children.length : 0;
+    var itemCount = container ? container.querySelectorAll('.card, .itemAction, .listItem').length : 0;
+
+    return {
+      hash: window.location.hash || '',
+      title: document.title || '',
+      activeIdx: activeIdx,
+      activeText: activeText,
+      activePageIdx: activePageIdx,
+      hasContainer: !!container,
+      childCount: childCount,
+      itemCount: itemCount
+    };
+  }
+
+  function logSnapshot(trace, label) {
+    tlog(trace, label, getDomSnapshot());
   }
 
   function findSectionLinks(topParentId) {
@@ -60,7 +116,10 @@
       return normalizeText(a.textContent) === 'home';
     })[0] || null;
 
-    return { currentLink: currentLink, otherLink: otherLink };
+    return {
+      currentLink: currentLink,
+      otherLink: otherLink
+    };
   }
 
   function waitFor(fn, opts) {
@@ -72,12 +131,17 @@
     return new Promise(function (resolve, reject) {
       var timer = setInterval(function () {
         var val = null;
-        try { val = fn(); } catch (e) {}
+
+        try {
+          val = fn();
+        } catch (e) {}
+
         if (val) {
           clearInterval(timer);
           resolve(val);
           return;
         }
+
         if (Date.now() - start >= timeout) {
           clearInterval(timer);
           reject(new Error(opts.name || 'waitFor timeout'));
@@ -86,36 +150,77 @@
     });
   }
 
-  // Wait until .emby-tabs and tab buttons are present on the back page
   function waitForBackPageTabs() {
     return waitFor(function () {
-      var tabs    = document.querySelector('.emby-tabs');
+      var tabs = document.querySelector('.emby-tabs');
       var buttons = document.querySelectorAll('.emby-tab-button[data-index]');
-      return (tabs && typeof tabs.selectedIndex === 'function' && buttons.length)
-        ? { tabs: tabs, buttons: buttons }
-        : null;
+      return (tabs && buttons.length) ? { tabs: tabs, buttons: buttons } : null;
     }, { name: 'waitForBackPageTabs', interval: 25, timeout: 5000 });
   }
 
-  // Wait until Jellyfin naturally returns on tab 0 and has populated content.
-  // This preserves the native loading spinner during the initial refresh cycle.
-  function waitForNaturalTabZeroLoad() {
-    return waitFor(function () {
-      var activeBtn = document.querySelector('.emby-tab-button-active');
-      var activeIdx = activeBtn ? activeBtn.getAttribute('data-index') : null;
-      var container = document.querySelector('[is="emby-itemscontainer"]');
-      var hasKids = !!(container && container.children && container.children.length > 0);
-
-      return (activeIdx === '0' && hasKids) ? true : null;
-    }, { name: 'waitForNaturalTabZeroLoad', interval: 50, timeout: 8000 });
+  function includesItemType(value, wanted) {
+    if (!value) return false;
+    return String(value).toLowerCase().split(',').indexOf(String(wanted).toLowerCase()) !== -1;
   }
 
-  // Repeatedly attempt to activate the saved tab until it becomes active
-  function restoreSavedTab(savedTabIndex) {
+  function isMatchingTrackedRequest(evt, topParentId, includeItemType) {
+    if (!evt || evt.kind !== 'getItems') return false;
+
+    var p = evt.finalParams || {};
+    var parentId = p.ParentId || p.parentId || '';
+    var includeTypes = p.IncludeItemTypes || p.includeItemTypes || '';
+    var hasJmp = p._jmp != null;
+
+    if (String(parentId) !== String(topParentId)) return false;
+    if (!includesItemType(includeTypes, includeItemType)) return false;
+    if (!hasJmp) return false;
+
+    return true;
+  }
+
+  function waitForTrackedRequest(topParentId, includeItemType, trace) {
+    return waitFor(function () {
+      var tracker = window.__jmpReq;
+      if (!tracker || !tracker.events || !tracker.events.length) return null;
+
+      var events = tracker.events;
+      var i;
+      for (i = events.length - 1; i >= 0; i--) {
+        if (isMatchingTrackedRequest(events[i], topParentId, includeItemType)) {
+          return events[i];
+        }
+      }
+      return null;
+    }, { name: 'waitForTrackedRequest(' + includeItemType + ')', interval: 25, timeout: 8000 }).then(function(evt) {
+      tlog(trace, 'tracked request seen for', includeItemType, evt);
+      return evt;
+    });
+  }
+
+  function waitForTrackedRequestDone(reqId, trace) {
+    return waitFor(function () {
+      var tracker = window.__jmpReq;
+      if (!tracker || !tracker.events) return null;
+
+      var events = tracker.events;
+      var i;
+      for (i = events.length - 1; i >= 0; i--) {
+        if (events[i].id === reqId && events[i].done) {
+          return events[i];
+        }
+      }
+      return null;
+    }, { name: 'waitForTrackedRequestDone(' + reqId + ')', interval: 25, timeout: 12000 }).then(function(evt) {
+      tlog(trace, 'tracked request done', evt);
+      return evt;
+    });
+  }
+
+  function restoreSavedTab(savedTabIndex, trace) {
     return new Promise(function (resolve, reject) {
-      var start  = Date.now();
-      var maxMs  = 3000;
-      var tries  = 0;
+      var start = Date.now();
+      var maxMs = 3000;
+      var tries = 0;
 
       var timer = setInterval(function () {
         tries++;
@@ -125,102 +230,110 @@
 
         if (String(savedTabIndex) === String(activeIdx)) {
           clearInterval(timer);
-          log('saved tab active:', savedTabIndex, 'after', tries, 'tries');
+          tlog(trace, 'saved tab active:', savedTabIndex, 'after', tries, 'tries');
+          logSnapshot(trace, 'restoreSavedTab:resolved');
           resolve();
           return;
         }
 
-        // Try direct button click first (most reliable on old QtWebEngine/Chromium 56),
-        // then fall back to the selectedIndex API
         var tabBtn = document.querySelector('.emby-tab-button[data-index="' + savedTabIndex + '"]');
         if (tabBtn) {
           tabBtn.click();
-          log('clicking tab button[data-index=' + savedTabIndex + '], current active:', activeIdx, 'try:', tries);
+          tlog(trace, 'clicking saved tab button[data-index=' + savedTabIndex + '], current active:', activeIdx, 'try:', tries);
         } else {
           var tabs = document.querySelector('.emby-tabs');
           if (tabs && typeof tabs.selectedIndex === 'function') {
             try {
               tabs.selectedIndex(savedTabIndex);
-              log('selectedIndex(' + savedTabIndex + '), current active:', activeIdx, 'try:', tries);
+              tlog(trace, 'selectedIndex(' + savedTabIndex + '), current active:', activeIdx, 'try:', tries);
             } catch (e) {
-              log('selectedIndex threw:', e);
+              tlog(trace, 'selectedIndex threw:', e);
             }
           }
         }
 
         if (Date.now() - start > maxMs) {
           clearInterval(timer);
+          logSnapshot(trace, 'restoreSavedTab:timeout');
           reject(new Error('restoreSavedTab timeout; active=' + activeIdx));
         }
-      }, 40);
+      }, 60);
     });
   }
 
   // ── Core refresh sequence ────────────────────────────────────────────────────
 
   function doRefresh() {
-    var topParentId   = getHashParam('topParentId');
+    var trace = makeRefreshTrace();
+    var topParentId = getHashParam('topParentId');
     var savedTabIndex = getActiveTabIndex();
 
-    log('START — topParentId:', topParentId, 'savedTabIndex:', savedTabIndex);
+    tlog(trace, 'START — topParentId:', topParentId, 'savedTabIndex:', savedTabIndex);
+    logSnapshot(trace, 'initial');
 
     if (!topParentId) {
-      log('ABORT: no topParentId in hash');
+      tlog(trace, 'ABORT: no topParentId in hash');
       return;
     }
 
-    // 1. Clear our custom cache for the current section
     if (typeof window.__jmpClearCache === 'function') {
       window.__jmpClearCache();
-      log('__jmpClearCache() called');
+      tlog(trace, '__jmpClearCache() called');
     } else {
-      log('WARNING: __jmpClearCache missing');
+      tlog(trace, 'WARNING: __jmpClearCache missing');
     }
 
-    // 2. Find the Home link (away destination) and the current section link (back destination)
     var links = findSectionLinks(topParentId);
-    log('currentLink:', links.currentLink ? links.currentLink.href : 'NOT FOUND');
-    log('otherLink (Home):', links.otherLink ? links.otherLink.href : 'NOT FOUND');
+    tlog(trace, 'currentLink:', links.currentLink ? links.currentLink.href : 'NOT FOUND');
+    tlog(trace, 'otherLink (Home):', links.otherLink ? links.otherLink.href : 'NOT FOUND');
 
     if (!links.currentLink) {
-      log('ABORT: currentLink missing');
+      tlog(trace, 'ABORT: currentLink missing');
       return;
     }
+
     if (!links.otherLink) {
-      log('ABORT: Home link not found');
+      tlog(trace, 'ABORT: Home link not found');
       return;
     }
 
-    // 3. Navigate away to Home
-    log('navigating to Home');
+    tlog(trace, 'navigating to Home');
     links.otherLink.click();
+    logSnapshot(trace, 'after-home-click');
 
-    // 4. Navigate back to the original section, then restore the saved tab
     setTimeout(function () {
-      log('navigating back to section');
+      tlog(trace, 'navigating back to section');
       links.currentLink.click();
+      logSnapshot(trace, 'after-back-click');
 
       waitForBackPageTabs()
         .then(function () {
-          log('back page tabs ready');
-          
-          // If tab 0 was already the active tab, let the natural refresh stand.
+          tlog(trace, 'back page tabs ready');
+          logSnapshot(trace, 'back-page-tabs-ready');
+
           if (savedTabIndex === 0) {
-            log('savedTabIndex is 0; no restore needed');
+            tlog(trace, 'savedTabIndex is 0; no restore needed');
             return null;
           }
 
-          return waitForNaturalTabZeroLoad()
-            .then(function () {
-              log('natural tab-0 load complete; restoring saved tab', savedTabIndex);
-              return restoreSavedTab(savedTabIndex);
+          // Wait for the actual refreshed Movies (tab 0) request, not DOM children.
+          return waitForTrackedRequest(topParentId, 'Movie', trace)
+            .then(function(evt) {
+              return waitForTrackedRequestDone(evt.id, trace);
+            })
+            .then(function(evt) {
+              tlog(trace, 'movies refresh request completed; restoring saved tab', savedTabIndex, evt);
+              logSnapshot(trace, 'before-restore-saved-tab');
+              return restoreSavedTab(savedTabIndex, trace);
             });
         })
         .then(function () {
-          log('DONE');
+          tlog(trace, 'DONE');
+          logSnapshot(trace, 'final');
         })
         .catch(function (err) {
-          log('ERROR:', err && err.message ? err.message : err);
+          tlog(trace, 'ERROR:', err && err.message ? err.message : err);
+          logSnapshot(trace, 'error');
         });
     }, 50);
   }
@@ -289,7 +402,6 @@
     init();
   }
 
-  // Expose for manual testing from DevTools
   window.__jmpTestRefresh = doRefresh;
 
 })();
