@@ -97,8 +97,21 @@
     }, { name: 'waitForBackPageTabs', interval: 25, timeout: 5000 });
   }
 
+  // Wait until Jellyfin naturally returns on tab 0 and has populated content.
+  // This preserves the native loading spinner during the initial refresh cycle.
+  function waitForNaturalTabZeroLoad() {
+    return waitFor(function () {
+      var activeBtn = document.querySelector('.emby-tab-button-active');
+      var activeIdx = activeBtn ? activeBtn.getAttribute('data-index') : null;
+      var container = document.querySelector('[is="emby-itemscontainer"]');
+      var hasKids = !!(container && container.children && container.children.length > 0);
+
+      return (activeIdx === '0' && hasKids) ? true : null;
+    }, { name: 'waitForNaturalTabZeroLoad', interval: 50, timeout: 8000 });
+  }
+
   // Repeatedly attempt to activate the saved tab until it becomes active
-  function forceTabUntilActive(savedTabIndex) {
+  function restoreSavedTab(savedTabIndex) {
     return new Promise(function (resolve, reject) {
       var start  = Date.now();
       var maxMs  = 3000;
@@ -137,7 +150,7 @@
 
         if (Date.now() - start > maxMs) {
           clearInterval(timer);
-          reject(new Error('forceTabUntilActive timeout; active=' + activeIdx));
+          reject(new Error('restoreSavedTab timeout; active=' + activeIdx));
         }
       }, 40);
     });
@@ -189,8 +202,19 @@
 
       waitForBackPageTabs()
         .then(function () {
-          log('back page tabs ready; restoring tab', savedTabIndex);
-          return forceTabUntilActive(savedTabIndex);
+          log('back page tabs ready');
+          
+          // If tab 0 was already the active tab, let the natural refresh stand.
+          if (savedTabIndex === 0) {
+            log('savedTabIndex is 0; no restore needed');
+            return null;
+          }
+
+          return waitForNaturalTabZeroLoad()
+            .then(function () {
+              log('natural tab-0 load complete; restoring saved tab', savedTabIndex);
+              return restoreSavedTab(savedTabIndex);
+            });
         })
         .then(function () {
           log('DONE');
