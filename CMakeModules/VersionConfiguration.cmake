@@ -32,6 +32,8 @@ set(CANONICAL_VERSION_STRING "1.12.0-${GIT_REVISION}")
 
 configure_file(src/core/Version.cpp.in src/core/Version.cpp)
 
-if(WIN32)
-  configure_file(bundle/win/iconres.rc.in bundle/win/iconres.rc)
-endif()
+# if(WIN32)
+#   configure_file(
+#     ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc.in 
+#     ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc)
+# endif()
