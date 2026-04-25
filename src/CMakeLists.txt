@@ -101,6 +101,7 @@ endif()
 
 if(WIN32)
   list(APPEND RESOURCE_FILES ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc)
+  list(APPEND RESOURCE_FILES ${CMAKE_BINARY_DIR}/bundle/win/version.rc)
 endif()
 
 set(RESOURCE_ROOT .)

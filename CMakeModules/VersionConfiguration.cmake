@@ -11,6 +11,14 @@ else(FULL_GIT_REVISION STREQUAL "GITDIR-NOTFOUND")
  string(SUBSTRING ${FULL_GIT_REVISION} 0 8 GIT_REVISION)
 endif(FULL_GIT_REVISION STREQUAL "GITDIR-NOTFOUND")
 
+# Get git branch name
+execute_process(
+  COMMAND git rev-parse --abbrev-ref HEAD
+  WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  OUTPUT_VARIABLE GIT_BRANCH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
 # Get the build number if available
 if(DEFINED ENV{BUILD_NUMBER})
   set(VERSION_BUILD "$ENV{BUILD_NUMBER}")
@@ -26,14 +34,13 @@ set(VERSION_NANO 0)
 
 option(UPGRADE_DEBUG "" OFF)
 
-set(VERSION_STRING "1.12.0-${GIT_REVISION}")
+set(VERSION_STRING "1.12.0")
 set(VERSION_STRING_SHORT "1.12.0")
-set(CANONICAL_VERSION_STRING "1.12.0-${GIT_REVISION}")
+set(CANONICAL_VERSION_STRING "1.12.0")
+set(JWCUSTOM_VERSION_DESC "1.12.0-JW-${GIT_BRANCH}-${GIT_REVISION}")
 
 configure_file(src/core/Version.cpp.in src/core/Version.cpp)
 
-# if(WIN32)
-#   configure_file(
-#     ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc.in 
-#     ${CMAKE_SOURCE_DIR}/bundle/win/iconres.rc)
-# endif()
+if(WIN32)
+  configure_file(bundle/win/version.rc.in bundle/win/version.rc)
+endif()
