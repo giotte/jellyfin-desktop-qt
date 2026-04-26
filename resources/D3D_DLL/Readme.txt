@@ -1,0 +1,1 @@
+This version of D3DCompiler_47.dll will run on Windows 8.1. Copy this file into the main Jellyfin Media Player directory (where the main exe is) and rename as D3DCompiler_47.dll (overwriting or renaming the existing D3DCompiler_47.dll file as needed).

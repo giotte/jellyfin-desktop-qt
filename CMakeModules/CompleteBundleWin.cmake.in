@@ -1,6 +1,7 @@
 set(PROJECT_SOURCE_DIR @PROJECT_SOURCE_DIR@)
 
-execute_process(COMMAND @QTROOT@/bin/windeployqt.exe --verbose 9 --qmldir @SOURCE_ROOT@/src/ui ${CMAKE_INSTALL_PREFIX}/JellyfinMediaPlayer.exe)
+#execute_process(COMMAND @QTROOT@/bin/windeployqt.exe --verbose 9 --qmldir @SOURCE_ROOT@/src/ui ${CMAKE_INSTALL_PREFIX}/JellyfinMediaPlayer.exe)
+execute_process(COMMAND "@QTROOT@/bin/windeployqt.exe" --verbose 9 --qmldir "@SOURCE_ROOT@/src/ui" "${CMAKE_INSTALL_PREFIX}/JellyfinMediaPlayer.exe")
 
 # on windows windeployqt doesnt install non qt libraries, let cmake do that
 # include(BundleUtilities)
@@ -16,6 +17,11 @@ list(APPEND SEARCHDIRS ${CEC_DIR})
 # fixup_bundle("${CMAKE_INSTALL_PREFIX}/JellyfinMediaPlayer.exe" "" "${SEARCHDIRS}") 
 #install(PROGRAMS ${VCREDIST_DIR}/vcredist_msvc2017_x64.exe DESTINATION .)
 file(INSTALL @MPV_LIBRARY@ DESTINATION "${CMAKE_INSTALL_PREFIX}")
+
+# Copy Win8.1 D3DCompiler DLL
+file(INSTALL "@PROJECT_SOURCE_DIR@/resources/D3D_DLL/D3DCompiler_47.dll.Win81"
+     DESTINATION "${CMAKE_INSTALL_PREFIX}")
+message(STATUS "Copied Win8.1 D3DCompiler_47.dll.Win81 to output directory")
 
 if(@DO_ENABLE_ANGLE_DEP@)
   message(STATUS "Deploying separate ANGLE deps")
